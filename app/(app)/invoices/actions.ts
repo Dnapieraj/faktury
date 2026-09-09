@@ -7,6 +7,8 @@ import { prisma } from '@/lib/prisma'
 import { Prisma, type InvoiceStatus } from '@/lib/generated/prisma/client'
 import { computeInvoiceTotals, formatInvoiceNumber, highestSequence } from '@/lib/invoice'
 import { invoiceSchema } from '@/lib/validations/invoice'
+import { isStripeEnabled } from '@/lib/stripe'
+import { createInvoiceCheckoutSession } from '@/lib/payments'
 
 export type InvoiceFormState = {
   error?: string
@@ -183,6 +185,65 @@ export async function setInvoiceStatusAction(id: string, next: InvoiceStatus) {
   revalidatePath(`/invoices/${id}`)
   revalidatePath('/dashboard')
   return { ok: true }
+}
+
+/**
+ * Ensure a Stripe payment link exists for the invoice. Creating one also moves
+ * a DRAFT to SENT. Reuses an existing link unless it was already paid.
+ */
+export async function createPaymentLinkAction(id: string) {
+  if (!isStripeEnabled) {
+    return { error: 'Płatności online nie są skonfigurowane (brak kluczy Stripe).' }
+  }
+
+  const { user } = await requireCompany()
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, userId: user.id },
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      currency: true,
+      totalGross: true,
+      paymentUrl: true,
+      stripeSessionId: true,
+      client: { select: { email: true } },
+    },
+  })
+  if (!invoice) return { error: 'Nie znaleziono faktury.' }
+  if (invoice.status === 'PAID') return { error: 'Faktura jest już opłacona.' }
+
+  if (invoice.paymentUrl && invoice.stripeSessionId) {
+    return { ok: true, url: invoice.paymentUrl }
+  }
+
+  let session: { sessionId: string; url: string | null }
+  try {
+    session = await createInvoiceCheckoutSession({
+      id: invoice.id,
+      number: invoice.number,
+      currency: invoice.currency,
+      totalGross: Number(invoice.totalGross),
+      clientEmail: invoice.client.email,
+    })
+  } catch (error) {
+    console.error('[stripe] checkout session failed', error)
+    return { error: 'Nie udało się utworzyć linku do płatności. Spróbuj ponownie.' }
+  }
+
+  await prisma.invoice.update({
+    where: { id: invoice.id },
+    data: {
+      stripeSessionId: session.sessionId,
+      paymentUrl: session.url,
+      ...(invoice.status === 'DRAFT' ? { status: 'SENT', sentAt: new Date() } : {}),
+    },
+  })
+
+  revalidatePath('/invoices')
+  revalidatePath(`/invoices/${invoice.id}`)
+  revalidatePath('/dashboard')
+  return { ok: true, url: session.url }
 }
 
 export async function deleteInvoiceAction(id: string) {
