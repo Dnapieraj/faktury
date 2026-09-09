@@ -20,7 +20,7 @@ async function main() {
       company: {
         create: {
           name: 'Studio Kreatywne Kowalski',
-          taxId: '5213870274',
+          taxId: '5252248481',
           addressLine: 'ul. Przykładowa 12/3',
           postalCode: '00-001',
           city: 'Warszawa',
