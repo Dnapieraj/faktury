@@ -11,6 +11,9 @@ const MESSAGES: Record<string, { type: 'success' | 'error'; text: string }> = {
   'client-archived': { type: 'success', text: 'Klient zarchiwizowany.' },
   'client-restored': { type: 'success', text: 'Klient przywrócony.' },
   'settings-saved': { type: 'success', text: 'Ustawienia zapisane.' },
+  'invoice-created': { type: 'success', text: 'Szkic faktury zapisany.' },
+  'invoice-updated': { type: 'success', text: 'Zmiany zapisane.' },
+  'invoice-deleted': { type: 'success', text: 'Faktura usunięta.' },
 }
 
 /** Reads `?toast=<key>`, shows it once, then strips it from the URL. */

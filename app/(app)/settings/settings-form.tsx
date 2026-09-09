@@ -37,7 +37,12 @@ export function SettingsForm({ values }: { values: CompanyFormValues }) {
         </CardHeader>
         <CardContent className="grid gap-5 sm:grid-cols-2">
           <Field className="sm:col-span-2" label="Nazwa" htmlFor="name" required error={fe?.name}>
-            <Input id="name" name="name" defaultValue={values.name} aria-invalid={Boolean(fe?.name)} />
+            <Input
+              id="name"
+              name="name"
+              defaultValue={values.name}
+              aria-invalid={Boolean(fe?.name)}
+            />
           </Field>
           <Field label="NIP" htmlFor="taxId" error={fe?.taxId}>
             <Input
@@ -57,7 +62,12 @@ export function SettingsForm({ values }: { values: CompanyFormValues }) {
               aria-invalid={Boolean(fe?.email)}
             />
           </Field>
-          <Field className="sm:col-span-2" label="Adres" htmlFor="addressLine" error={fe?.addressLine}>
+          <Field
+            className="sm:col-span-2"
+            label="Adres"
+            htmlFor="addressLine"
+            error={fe?.addressLine}
+          >
             <Input
               id="addressLine"
               name="addressLine"
@@ -76,10 +86,20 @@ export function SettingsForm({ values }: { values: CompanyFormValues }) {
             />
           </Field>
           <Field label="Miejscowość" htmlFor="city" error={fe?.city}>
-            <Input id="city" name="city" defaultValue={values.city ?? ''} aria-invalid={Boolean(fe?.city)} />
+            <Input
+              id="city"
+              name="city"
+              defaultValue={values.city ?? ''}
+              aria-invalid={Boolean(fe?.city)}
+            />
           </Field>
           <Field label="Telefon" htmlFor="phone" error={fe?.phone}>
-            <Input id="phone" name="phone" defaultValue={values.phone ?? ''} aria-invalid={Boolean(fe?.phone)} />
+            <Input
+              id="phone"
+              name="phone"
+              defaultValue={values.phone ?? ''}
+              aria-invalid={Boolean(fe?.phone)}
+            />
           </Field>
           <Field
             label="Numer konta (IBAN)"
@@ -117,7 +137,11 @@ export function SettingsForm({ values }: { values: CompanyFormValues }) {
               aria-invalid={Boolean(fe?.invoicePrefix)}
             />
           </Field>
-          <Field label="Termin płatności (dni)" htmlFor="paymentTermDays" error={fe?.paymentTermDays}>
+          <Field
+            label="Termin płatności (dni)"
+            htmlFor="paymentTermDays"
+            error={fe?.paymentTermDays}
+          >
             <Input
               id="paymentTermDays"
               name="paymentTermDays"

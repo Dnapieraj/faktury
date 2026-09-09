@@ -4,12 +4,24 @@ import Link from 'next/link'
 import { ChevronLeft, Pencil } from 'lucide-react'
 import { requireCompany } from '@/lib/auth'
 import { getClientOr404 } from '@/lib/data/clients'
+import { listInvoices } from '@/lib/data/invoices'
 import { formatNip } from '@/lib/nip'
+import { formatMoney } from '@/lib/money'
+import { formatDate } from '@/lib/date'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { PageHeader } from '@/components/ui/page-header'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { InvoiceStatusBadge } from '@/components/invoices/invoice-status-badge'
 import { cn } from '@/lib/utils'
 import { ClientRowActions } from '../_components/client-row-actions'
 
@@ -33,6 +45,7 @@ export default async function ClientDetailPage({ params }: PageProps<'/clients/[
   const { user } = await requireCompany()
   const { id } = await params
   const client = await getClientOr404(user.id, id)
+  const invoices = await listInvoices(user.id, { clientId: client.id })
 
   const address = [client.addressLine, [client.postalCode, client.city].filter(Boolean).join(' ')]
     .filter(Boolean)
@@ -114,10 +127,46 @@ export default async function ClientDetailPage({ params }: PageProps<'/clients/[
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold tracking-tight">Faktury tego klienta</h2>
-        <EmptyState
-          title="Brak faktur"
-          description="Faktury wystawione temu klientowi pojawią się tutaj."
-        />
+        {invoices.length === 0 ? (
+          <EmptyState
+            title="Brak faktur"
+            description="Faktury wystawione temu klientowi pojawią się tutaj."
+          />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Numer</TableHead>
+                <TableHead className="hidden sm:table-cell">Wystawiono</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Brutto</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoices.map((inv) => (
+                <TableRow key={inv.id}>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/invoices/${inv.id}`}
+                      className="hover:text-primary hover:underline"
+                    >
+                      {inv.number}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground hidden sm:table-cell">
+                    {formatDate(inv.issueDate)}
+                  </TableCell>
+                  <TableCell>
+                    <InvoiceStatusBadge status={inv.status} dueDate={inv.dueDate} />
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {formatMoney(inv.totalGross.toString(), inv.currency)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </section>
     </div>
   )
