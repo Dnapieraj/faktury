@@ -1,12 +1,12 @@
 import 'server-only'
+import { emailPaymentConfirmation } from '@/lib/email/invoices'
 
-/**
- * Side effects to run when an invoice becomes paid (Stripe webhook / manual).
- * Transactional e-mail is wired up in the Resend milestone — for now this just
- * logs so the flow is observable.
- */
+/** Side effects to run when an invoice becomes paid (Stripe webhook / manual). */
 export async function onInvoicePaid(invoiceId: string): Promise<void> {
-  console.info(`[notifications] invoice ${invoiceId} marked as paid`)
+  const res = await emailPaymentConfirmation(invoiceId)
+  if (!res.ok && !res.skipped) {
+    console.error(`[notifications] payment confirmation for ${invoiceId}: ${res.error}`)
+  }
 }
 
 /** Side effects when an invoice is issued/sent to the client. */
