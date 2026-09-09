@@ -4,10 +4,12 @@ import { ChevronLeft, Download } from 'lucide-react'
 import { requireCompany } from '@/lib/auth'
 import { getInvoiceOr404 } from '@/lib/data/invoices'
 import { buildInvoiceView } from '@/lib/invoice-view'
+import { isStripeEnabled } from '@/lib/stripe'
 import { buttonVariants } from '@/components/ui/button'
 import { PageHeader } from '@/components/ui/page-header'
 import { InvoiceDocument } from '@/components/invoices/invoice-document'
 import { InvoiceStatusBadge } from '@/components/invoices/invoice-status-badge'
+import { PaymentPanel } from '@/components/invoices/payment-panel'
 import { cn } from '@/lib/utils'
 import { InvoiceActions } from '../_components/invoice-actions'
 
@@ -64,6 +66,15 @@ export default async function InvoiceDetailPage({ params }: PageProps<'/invoices
           </>
         }
       />
+
+      {invoice.status !== 'PAID' || invoice.paymentUrl ? (
+        <PaymentPanel
+          invoiceId={invoice.id}
+          status={invoice.status}
+          paymentUrl={invoice.paymentUrl}
+          stripeEnabled={isStripeEnabled}
+        />
+      ) : null}
 
       <InvoiceDocument
         number={view.number}
