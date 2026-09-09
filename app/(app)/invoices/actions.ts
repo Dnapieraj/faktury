@@ -8,6 +8,7 @@ import { Prisma, type InvoiceStatus } from '@/lib/generated/prisma/client'
 import { computeInvoiceTotals } from '@/lib/invoice'
 import { createInvoice } from '@/lib/invoice-create'
 import { invoiceSchema } from '@/lib/validations/invoice'
+import { formToObject } from '@/lib/form'
 import { isStripeEnabled } from '@/lib/stripe'
 import { createInvoiceCheckoutSession } from '@/lib/payments'
 import { issueAndSendInvoice } from '@/lib/invoice-issue'
@@ -19,14 +20,7 @@ export type InvoiceFormState = {
 }
 
 function parseForm(formData: FormData) {
-  return invoiceSchema.safeParse({
-    clientId: formData.get('clientId'),
-    issueDate: formData.get('issueDate'),
-    saleDate: formData.get('saleDate'),
-    dueDate: formData.get('dueDate'),
-    notes: formData.get('notes'),
-    items: formData.get('items'),
-  })
+  return invoiceSchema.safeParse(formToObject(formData))
 }
 
 export async function saveInvoiceAction(

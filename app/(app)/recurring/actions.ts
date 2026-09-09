@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireCompany } from '@/lib/auth'
+import { formToObject } from '@/lib/form'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@/lib/generated/prisma/client'
 import { computeNextRun } from '@/lib/recurring'
@@ -15,15 +16,8 @@ export type RecurringFormState = {
 }
 
 function parseForm(formData: FormData) {
-  return recurringSchema.safeParse({
-    clientId: formData.get('clientId'),
-    dayOfMonth: formData.get('dayOfMonth'),
-    paymentTermDays: formData.get('paymentTermDays'),
-    startDate: formData.get('startDate'),
-    endDate: formData.get('endDate') || undefined,
-    notes: formData.get('notes'),
-    items: formData.get('items'),
-  })
+  const raw = formToObject(formData)
+  return recurringSchema.safeParse({ ...raw, endDate: raw.endDate || undefined })
 }
 
 export async function saveRecurringAction(
