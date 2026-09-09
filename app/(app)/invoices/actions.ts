@@ -9,6 +9,8 @@ import { computeInvoiceTotals, formatInvoiceNumber, highestSequence } from '@/li
 import { invoiceSchema } from '@/lib/validations/invoice'
 import { isStripeEnabled } from '@/lib/stripe'
 import { createInvoiceCheckoutSession } from '@/lib/payments'
+import { onInvoiceSent } from '@/lib/notifications'
+import { emailInvoiceToClient, emailOverdueReminder } from '@/lib/email/invoices'
 
 export type InvoiceFormState = {
   error?: string
@@ -184,6 +186,92 @@ export async function setInvoiceStatusAction(id: string, next: InvoiceStatus) {
   revalidatePath('/invoices')
   revalidatePath(`/invoices/${id}`)
   revalidatePath('/dashboard')
+  return { ok: true }
+}
+
+/**
+ * Issue the invoice: create the payment link (if Stripe is on), e-mail the
+ * client the PDF + link, and move DRAFT -> SENT.
+ */
+export async function sendInvoiceAction(id: string) {
+  const { user } = await requireCompany()
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, userId: user.id },
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      currency: true,
+      totalGross: true,
+      paymentUrl: true,
+      stripeSessionId: true,
+      client: { select: { email: true } },
+    },
+  })
+  if (!invoice) return { error: 'Nie znaleziono faktury.' }
+  if (invoice.status === 'PAID') return { error: 'Faktura jest już opłacona.' }
+  if (!invoice.client.email) {
+    return { error: 'Klient nie ma adresu e-mail. Uzupełnij go w danych klienta.' }
+  }
+
+  let paymentUrl = invoice.paymentUrl
+  let stripeSessionId = invoice.stripeSessionId
+  if (isStripeEnabled && !paymentUrl) {
+    try {
+      const session = await createInvoiceCheckoutSession({
+        id: invoice.id,
+        number: invoice.number,
+        currency: invoice.currency,
+        totalGross: Number(invoice.totalGross),
+        clientEmail: invoice.client.email,
+      })
+      paymentUrl = session.url
+      stripeSessionId = session.sessionId
+    } catch (error) {
+      console.error('[stripe] checkout session failed', error)
+      return { error: 'Nie udało się utworzyć linku do płatności.' }
+    }
+  }
+
+  await prisma.invoice.update({
+    where: { id: invoice.id },
+    data: {
+      paymentUrl,
+      stripeSessionId,
+      status: invoice.status === 'DRAFT' ? 'SENT' : invoice.status,
+      sentAt: new Date(),
+    },
+  })
+
+  const email = await emailInvoiceToClient(invoice.id)
+  await onInvoiceSent(invoice.id)
+
+  revalidatePath('/invoices')
+  revalidatePath(`/invoices/${invoice.id}`)
+  revalidatePath('/dashboard')
+
+  if (!email.ok) {
+    return email.skipped ? { ok: true, emailSkipped: true } : { error: email.error }
+  }
+  return { ok: true }
+}
+
+/**
+ * Send an overdue reminder e-mail for a SENT/OVERDUE invoice.
+ */
+export async function sendReminderAction(id: string) {
+  const { user } = await requireCompany()
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, userId: user.id },
+    select: { id: true, status: true },
+  })
+  if (!invoice) return { error: 'Nie znaleziono faktury.' }
+  if (invoice.status !== 'SENT' && invoice.status !== 'OVERDUE') {
+    return { error: 'Przypomnienie można wysłać tylko dla wystawionej faktury.' }
+  }
+
+  const res = await emailOverdueReminder(invoice.id)
+  if (!res.ok) return res.skipped ? { ok: true, emailSkipped: true } : { error: res.error }
   return { ok: true }
 }
 
