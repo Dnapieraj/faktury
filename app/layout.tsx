@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="pl" className={`${inter.variable} h-full`} suppressHydrationWarning>
-      <body className="min-h-full antialiased">
+      <body className="min-h-full antialiased" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
