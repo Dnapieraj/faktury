@@ -103,23 +103,23 @@ export default async function DashboardPage() {
                 <CardTitle>Ostatnie faktury</CardTitle>
                 <Link
                   href="/invoices"
-                  className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
                 >
                   Wszystkie
                   <ArrowRight className="size-3.5" />
                 </Link>
               </CardHeader>
               <CardContent className="p-0">
-                <ul className="divide-y divide-border">
+                <ul className="divide-border divide-y">
                   {recent.map((inv) => (
                     <li key={inv.id}>
                       <Link
                         href={`/invoices/${inv.id}`}
-                        className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-surface-muted/50"
+                        className="hover:bg-surface-muted/50 flex items-center justify-between gap-3 px-5 py-3"
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{inv.number}</p>
-                          <p className="truncate text-xs text-muted-foreground">
+                          <p className="text-muted-foreground truncate text-xs">
                             {inv.client.name}
                           </p>
                         </div>
@@ -142,20 +142,20 @@ export default async function DashboardPage() {
               </CardHeader>
               <CardContent className={overdue.length === 0 ? '' : 'p-0'}>
                 {overdue.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-muted-foreground text-sm">
                     Brak faktur po terminie. Tak trzymaj.
                   </p>
                 ) : (
-                  <ul className="divide-y divide-border">
+                  <ul className="divide-border divide-y">
                     {overdue.map((inv) => (
                       <li key={inv.id}>
                         <Link
                           href={`/invoices/${inv.id}`}
-                          className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-surface-muted/50"
+                          className="hover:bg-surface-muted/50 flex items-center justify-between gap-3 px-5 py-3"
                         >
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium">{inv.number}</p>
-                            <p className="truncate text-xs text-danger">
+                            <p className="text-danger truncate text-xs">
                               Termin: {formatDate(inv.dueDate)}
                             </p>
                           </div>

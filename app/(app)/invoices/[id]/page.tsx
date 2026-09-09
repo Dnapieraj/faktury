@@ -1,12 +1,14 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Download } from 'lucide-react'
 import { requireCompany } from '@/lib/auth'
 import { getInvoiceOr404 } from '@/lib/data/invoices'
-import { computeInvoiceTotals } from '@/lib/invoice'
+import { buildInvoiceView } from '@/lib/invoice-view'
+import { buttonVariants } from '@/components/ui/button'
 import { PageHeader } from '@/components/ui/page-header'
 import { InvoiceDocument } from '@/components/invoices/invoice-document'
 import { InvoiceStatusBadge } from '@/components/invoices/invoice-status-badge'
+import { cn } from '@/lib/utils'
 import { InvoiceActions } from '../_components/invoice-actions'
 
 export async function generateMetadata({ params }: PageProps<'/invoices/[id]'>): Promise<Metadata> {
@@ -20,23 +22,7 @@ export default async function InvoiceDetailPage({ params }: PageProps<'/invoices
   const { user, company } = await requireCompany()
   const { id } = await params
   const invoice = await getInvoiceOr404(user.id, id)
-
-  const { lines, vatBreakdown, totalNet, totalVat, totalGross } = computeInvoiceTotals(
-    invoice.items.map((it) => ({
-      name: it.name,
-      quantity: Number(it.quantity),
-      unitPriceNet: Number(it.unitPriceNet),
-      vatRate: Number(it.vatRate),
-    })),
-  )
-
-  const buyer = {
-    name: invoice.buyerName ?? invoice.client.name,
-    taxId: invoice.buyerTaxId ?? invoice.client.taxId,
-    addressLine: invoice.buyerAddressLine ?? invoice.client.addressLine,
-    postalCode: invoice.buyerPostalCode ?? invoice.client.postalCode,
-    city: invoice.buyerCity ?? invoice.client.city,
-  }
+  const view = buildInvoiceView(invoice, company)
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,30 +49,37 @@ export default async function InvoiceDetailPage({ params }: PageProps<'/invoices
             </Link>
           </>
         }
-        actions={<InvoiceActions id={invoice.id} status={invoice.status} />}
+        actions={
+          <>
+            <a
+              href={`/invoices/${invoice.id}/pdf`}
+              target="_blank"
+              rel="noopener"
+              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+            >
+              <Download />
+              PDF
+            </a>
+            <InvoiceActions id={invoice.id} status={invoice.status} />
+          </>
+        }
       />
 
       <InvoiceDocument
-        number={invoice.number}
-        issueDate={invoice.issueDate}
-        saleDate={invoice.saleDate}
-        dueDate={invoice.dueDate}
-        currency={invoice.currency}
-        seller={{
-          name: company.name,
-          taxId: company.taxId,
-          addressLine: company.addressLine,
-          postalCode: company.postalCode,
-          city: company.city,
-        }}
-        sellerIban={company.iban}
-        buyer={buyer}
-        lines={lines}
-        vatBreakdown={vatBreakdown}
-        totalNet={totalNet}
-        totalVat={totalVat}
-        totalGross={totalGross}
-        notes={invoice.notes}
+        number={view.number}
+        issueDate={view.issueDate}
+        saleDate={view.saleDate}
+        dueDate={view.dueDate}
+        currency={view.currency}
+        seller={view.seller}
+        sellerIban={view.sellerIban}
+        buyer={view.buyer}
+        lines={view.lines}
+        vatBreakdown={view.vatBreakdown}
+        totalNet={view.totalNet}
+        totalVat={view.totalVat}
+        totalGross={view.totalGross}
+        notes={view.notes}
       />
     </div>
   )
