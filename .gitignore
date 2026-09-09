@@ -44,3 +44,7 @@ next-env.d.ts
 
 # prisma generated client (regenerated on install / build)
 /lib/generated
+
+# local scratch
+/scratch-*
+*.local.pdf
