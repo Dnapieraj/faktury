@@ -7,11 +7,13 @@ const plnFormatter = new Intl.NumberFormat('pl-PL', {
   style: 'currency',
   currency: 'PLN',
   minimumFractionDigits: 2,
+  useGrouping: true,
 })
 
 const plainFormatter = new Intl.NumberFormat('pl-PL', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+  useGrouping: true,
 })
 
 /** `1234.5` -> `1 234,50 zł` */
