@@ -14,6 +14,9 @@ const MESSAGES: Record<string, { type: 'success' | 'error'; text: string }> = {
   'invoice-created': { type: 'success', text: 'Szkic faktury zapisany.' },
   'invoice-updated': { type: 'success', text: 'Zmiany zapisane.' },
   'invoice-deleted': { type: 'success', text: 'Faktura usunięta.' },
+  'recurring-created': { type: 'success', text: 'Szablon cykliczny utworzony.' },
+  'recurring-updated': { type: 'success', text: 'Zmiany zapisane.' },
+  'recurring-deleted': { type: 'success', text: 'Szablon usunięty.' },
 }
 
 /** Reads `?toast=<key>`, shows it once, then strips it from the URL. */

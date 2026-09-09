@@ -5,12 +5,13 @@ import { redirect } from 'next/navigation'
 import { requireCompany } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Prisma, type InvoiceStatus } from '@/lib/generated/prisma/client'
-import { computeInvoiceTotals, formatInvoiceNumber, highestSequence } from '@/lib/invoice'
+import { computeInvoiceTotals } from '@/lib/invoice'
+import { createInvoice } from '@/lib/invoice-create'
 import { invoiceSchema } from '@/lib/validations/invoice'
 import { isStripeEnabled } from '@/lib/stripe'
 import { createInvoiceCheckoutSession } from '@/lib/payments'
-import { onInvoiceSent } from '@/lib/notifications'
-import { emailInvoiceToClient, emailOverdueReminder } from '@/lib/email/invoices'
+import { issueAndSendInvoice } from '@/lib/invoice-issue'
+import { emailOverdueReminder } from '@/lib/email/invoices'
 
 export type InvoiceFormState = {
   error?: string
@@ -32,7 +33,7 @@ export async function saveInvoiceAction(
   _prev: InvoiceFormState,
   formData: FormData,
 ): Promise<InvoiceFormState> {
-  const { user, company } = await requireCompany()
+  const { user } = await requireCompany()
   const id = (formData.get('id') as string) || null
 
   const parsed = parseForm(formData)
@@ -41,45 +42,25 @@ export async function saveInvoiceAction(
   }
   const input = parsed.data
 
-  const client = await prisma.client.findFirst({
-    where: { id: input.clientId, userId: user.id },
-  })
-  if (!client) return { fieldErrors: { clientId: ['Nie znaleziono klienta'] } }
-
-  const totals = computeInvoiceTotals(input.items)
-  const buyerSnapshot = {
-    buyerName: client.name,
-    buyerTaxId: client.taxId,
-    buyerAddressLine: client.addressLine,
-    buyerCity: client.city,
-    buyerPostalCode: client.postalCode,
-  }
-  const itemRows = totals.lines.map((line, position) => ({
-    name: line.name,
-    quantity: new Prisma.Decimal(line.quantity),
-    unitPriceNet: new Prisma.Decimal(line.unitPriceNet),
-    vatRate: new Prisma.Decimal(line.vatRate),
-    position,
-  }))
-  const money = {
-    totalNet: new Prisma.Decimal(totals.totalNet),
-    totalVat: new Prisma.Decimal(totals.totalVat),
-    totalGross: new Prisma.Decimal(totals.totalGross),
-  }
-
   let invoiceId: string
   let isNew = false
 
   if (id) {
     const existing = await prisma.invoice.findFirst({
       where: { id, userId: user.id },
-      select: { id: true, status: true },
+      select: { id: true, status: true, clientId: true },
     })
     if (!existing) return { error: 'Nie znaleziono faktury.' }
     if (existing.status !== 'DRAFT') {
       return { error: 'Edytować można tylko szkice. Cofnij fakturę do szkicu, aby ją zmienić.' }
     }
 
+    const client = await prisma.client.findFirst({
+      where: { id: input.clientId, userId: user.id },
+    })
+    if (!client) return { fieldErrors: { clientId: ['Nie znaleziono klienta'] } }
+
+    const totals = computeInvoiceTotals(input.items)
     await prisma.invoice.update({
       where: { id },
       data: {
@@ -88,71 +69,49 @@ export async function saveInvoiceAction(
         saleDate: input.saleDate,
         dueDate: input.dueDate,
         notes: input.notes,
-        ...buyerSnapshot,
-        ...money,
-        items: { deleteMany: {}, create: itemRows },
+        buyerName: client.name,
+        buyerTaxId: client.taxId,
+        buyerAddressLine: client.addressLine,
+        buyerCity: client.city,
+        buyerPostalCode: client.postalCode,
+        totalNet: new Prisma.Decimal(totals.totalNet),
+        totalVat: new Prisma.Decimal(totals.totalVat),
+        totalGross: new Prisma.Decimal(totals.totalGross),
+        items: {
+          deleteMany: {},
+          create: totals.lines.map((line, position) => ({
+            name: line.name,
+            quantity: new Prisma.Decimal(line.quantity),
+            unitPriceNet: new Prisma.Decimal(line.unitPriceNet),
+            vatRate: new Prisma.Decimal(line.vatRate),
+            position,
+          })),
+        },
       },
     })
     invoiceId = id
   } else {
     isNew = true
-    const year = input.issueDate.getFullYear()
-    invoiceId = await createWithNumber(user.id, company.invoicePrefix, year, (number) =>
-      prisma.invoice.create({
-        data: {
-          userId: user.id,
-          clientId: input.clientId,
-          number,
-          issueDate: input.issueDate,
-          saleDate: input.saleDate,
-          dueDate: input.dueDate,
-          notes: input.notes,
-          currency: 'PLN',
-          ...buyerSnapshot,
-          ...money,
-          items: { create: itemRows },
-        },
-        select: { id: true },
-      }),
-    )
+    try {
+      const created = await createInvoice(user.id, {
+        clientId: input.clientId,
+        issueDate: input.issueDate,
+        saleDate: input.saleDate,
+        dueDate: input.dueDate,
+        notes: input.notes,
+        items: input.items,
+      })
+      invoiceId = created.id
+    } catch (error) {
+      console.error('[invoices] create failed', error)
+      return { error: 'Nie udało się zapisać faktury. Spróbuj ponownie.' }
+    }
   }
 
   revalidatePath('/invoices')
   revalidatePath(`/invoices/${invoiceId}`)
   revalidatePath('/dashboard')
   redirect(`/invoices/${invoiceId}?toast=${isNew ? 'invoice-created' : 'invoice-updated'}`)
-}
-
-/** Retry a few times on the unique [userId, number] collision under concurrency. */
-async function createWithNumber(
-  userId: string,
-  prefix: string,
-  year: number,
-  create: (number: string) => Promise<{ id: string }>,
-): Promise<string> {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const used = await prisma.invoice.findMany({
-      where: { userId, number: { startsWith: `${prefix}/${year}/` } },
-      select: { number: true },
-    })
-    const number = formatInvoiceNumber(
-      prefix,
-      year,
-      highestSequence(
-        used.map((u) => u.number),
-        prefix,
-        year,
-      ) + 1,
-    )
-    try {
-      const created = await create(number)
-      return created.id
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') continue
-      throw error
-    }
-  }
-  throw new Error('Nie udało się nadać numeru faktury. Spróbuj ponownie.')
 }
 
 const ALLOWED_TRANSITIONS: Record<InvoiceStatus, InvoiceStatus[]> = {
@@ -195,65 +154,20 @@ export async function setInvoiceStatusAction(id: string, next: InvoiceStatus) {
  */
 export async function sendInvoiceAction(id: string) {
   const { user } = await requireCompany()
-  const invoice = await prisma.invoice.findFirst({
+  const owned = await prisma.invoice.findFirst({
     where: { id, userId: user.id },
-    select: {
-      id: true,
-      number: true,
-      status: true,
-      currency: true,
-      totalGross: true,
-      paymentUrl: true,
-      stripeSessionId: true,
-      client: { select: { email: true } },
-    },
+    select: { id: true },
   })
-  if (!invoice) return { error: 'Nie znaleziono faktury.' }
-  if (invoice.status === 'PAID') return { error: 'Faktura jest już opłacona.' }
-  if (!invoice.client.email) {
-    return { error: 'Klient nie ma adresu e-mail. Uzupełnij go w danych klienta.' }
-  }
+  if (!owned) return { error: 'Nie znaleziono faktury.' }
 
-  let paymentUrl = invoice.paymentUrl
-  let stripeSessionId = invoice.stripeSessionId
-  if (isStripeEnabled && !paymentUrl) {
-    try {
-      const session = await createInvoiceCheckoutSession({
-        id: invoice.id,
-        number: invoice.number,
-        currency: invoice.currency,
-        totalGross: Number(invoice.totalGross),
-        clientEmail: invoice.client.email,
-      })
-      paymentUrl = session.url
-      stripeSessionId = session.sessionId
-    } catch (error) {
-      console.error('[stripe] checkout session failed', error)
-      return { error: 'Nie udało się utworzyć linku do płatności.' }
-    }
-  }
-
-  await prisma.invoice.update({
-    where: { id: invoice.id },
-    data: {
-      paymentUrl,
-      stripeSessionId,
-      status: invoice.status === 'DRAFT' ? 'SENT' : invoice.status,
-      sentAt: new Date(),
-    },
-  })
-
-  const email = await emailInvoiceToClient(invoice.id)
-  await onInvoiceSent(invoice.id)
+  const res = await issueAndSendInvoice(id)
 
   revalidatePath('/invoices')
-  revalidatePath(`/invoices/${invoice.id}`)
+  revalidatePath(`/invoices/${id}`)
   revalidatePath('/dashboard')
 
-  if (!email.ok) {
-    return email.skipped ? { ok: true, emailSkipped: true } : { error: email.error }
-  }
-  return { ok: true }
+  if (!res.ok) return { error: res.error }
+  return res.emailed ? { ok: true } : { ok: true, emailSkipped: true }
 }
 
 /**

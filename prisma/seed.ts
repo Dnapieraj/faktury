@@ -4,6 +4,7 @@ import { hashPassword } from '../lib/password'
 import { computeInvoiceTotals, formatInvoiceNumber } from '../lib/invoice'
 import { Prisma } from '../lib/generated/prisma/client'
 import { addDays } from '../lib/date'
+import { computeNextRun } from '../lib/recurring'
 
 /**
  * Dev seed. Log in with:
@@ -38,6 +39,7 @@ async function main() {
 
   // Fresh demo data each run.
   await prisma.invoice.deleteMany({ where: { userId: user.id } })
+  await prisma.recurringInvoice.deleteMany({ where: { userId: user.id } })
   await prisma.client.deleteMany({ where: { userId: user.id } })
 
   const [acme, nova] = await Promise.all([
@@ -139,7 +141,31 @@ async function main() {
     })
   }
 
-  console.log(`✓ demo: ${user.email} — 2 klientów, ${drafts.length} faktur`)
+  await prisma.recurringInvoice.create({
+    data: {
+      userId: user.id,
+      clientId: acme.id,
+      status: 'ACTIVE',
+      dayOfMonth: 1,
+      paymentTermDays: 14,
+      startDate: addDays(new Date(), -90),
+      nextRunAt: computeNextRun(new Date(), 1),
+      notes: 'Faktura abonamentowa.',
+      items: {
+        create: [
+          {
+            name: 'Utrzymanie i wsparcie (abonament)',
+            quantity: new Prisma.Decimal(1),
+            unitPriceNet: new Prisma.Decimal(1200),
+            vatRate: new Prisma.Decimal(23),
+            position: 0,
+          },
+        ],
+      },
+    },
+  })
+
+  console.log(`✓ demo: ${user.email} — 2 klientów, ${drafts.length} faktur, 1 szablon cykliczny`)
 }
 
 main()
