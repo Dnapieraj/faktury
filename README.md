@@ -15,15 +15,19 @@ Vercel Cron · Vitest + Playwright + GitHub Actions.
 
 ## Uruchomienie lokalne
 
-Wymagania: Node 24 (patrz `.nvmrc`), Docker Desktop.
+Wymagania: Node 24 (patrz `.nvmrc`). Baza lokalna działa przez `prisma dev` — bez Dockera.
 
 ```bash
 cp .env.example .env        # uzupełnij AUTH_SECRET: npx auth secret
 npm install
-npm run db:up               # Postgres w Dockerze (localhost:5432)
+npm run db:up               # lokalny Postgres przez `prisma dev` (w tle)
 npm run db:migrate          # migracje Prisma + generacja klienta
 npm run dev                 # http://localhost:3000
 ```
+
+Jeśli `prisma dev` wypisze inne porty niż w `.env.example`, sprawdź je przez `npx prisma dev ls`
+i zaktualizuj `DATABASE_URL` / `SHADOW_DATABASE_URL`. Na produkcji `DATABASE_URL` to connection
+string z Neona (`postgresql://...`) — `lib/prisma.ts` używa `@prisma/adapter-pg` w obu przypadkach.
 
 Przydatne: `npm run db:studio`, `npm run db:seed`, `npm run typecheck`, `npm run lint`,
 `npm run format`.
