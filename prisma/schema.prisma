@@ -1,0 +1,241 @@
+// Prisma schema — faktury (invoicing app for freelancers / small companies)
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js (email/password + Google). JWT session strategy — the Session table
+// is kept for adapter type-compatibility but stays unused.
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String? // null for OAuth-only accounts
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts          Account[]
+  sessions          Session[]
+  company           Company?
+  clients           Client[]
+  invoices          Invoice[]
+  recurringInvoices RecurringInvoice[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Domain: one user == one company. All data is isolated by userId.
+// ---------------------------------------------------------------------------
+
+model Company {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  name        String
+  taxId       String? // NIP
+  addressLine String?
+  city        String?
+  postalCode  String?
+  email       String?
+  phone       String?
+  iban        String?
+  logoUrl     String?
+
+  // Invoice defaults
+  invoicePrefix   String  @default("FV")
+  paymentTermDays Int     @default(14)
+  defaultVatRate  Decimal @default(23) @db.Decimal(5, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Client {
+  id          String  @id @default(cuid())
+  userId      String
+  name        String
+  taxId       String? // NIP
+  email       String?
+  addressLine String?
+  city        String?
+  postalCode  String?
+  country     String  @default("PL")
+  notes       String?
+  archived    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices          Invoice[]
+  recurringInvoices RecurringInvoice[]
+
+  @@index([userId])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+}
+
+model Invoice {
+  id       String        @id @default(cuid())
+  userId   String
+  clientId String
+  number   String
+  status   InvoiceStatus @default(DRAFT)
+
+  issueDate DateTime  @default(now())
+  saleDate  DateTime  @default(now())
+  dueDate   DateTime
+  paidAt    DateTime?
+  sentAt    DateTime?
+
+  currency String  @default("PLN")
+  notes    String?
+
+  // Buyer snapshot — frozen when the invoice leaves DRAFT so later client
+  // edits never rewrite history.
+  buyerName        String?
+  buyerTaxId       String?
+  buyerAddressLine String?
+  buyerCity        String?
+  buyerPostalCode  String?
+
+  // Cached totals (source of truth for dashboard aggregation).
+  totalNet   Decimal @default(0) @db.Decimal(12, 2)
+  totalVat   Decimal @default(0) @db.Decimal(12, 2)
+  totalGross Decimal @default(0) @db.Decimal(12, 2)
+
+  // Payments / documents — populated in later milestones.
+  stripeSessionId       String? @unique
+  stripePaymentIntentId String?
+  paymentUrl            String?
+  pdfUrl                String?
+
+  recurringInvoiceId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  items            InvoiceItem[]
+  recurringInvoice RecurringInvoice? @relation(fields: [recurringInvoiceId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, number])
+  @@index([userId, status])
+  @@index([clientId])
+}
+
+model InvoiceItem {
+  id           String  @id @default(cuid())
+  invoiceId    String
+  name         String
+  quantity     Decimal @db.Decimal(12, 3)
+  unitPriceNet Decimal @db.Decimal(12, 2)
+  vatRate      Decimal @db.Decimal(5, 2)
+  position     Int     @default(0)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum RecurringInterval {
+  MONTHLY
+}
+
+model RecurringInvoice {
+  id       String            @id @default(cuid())
+  userId   String
+  clientId String
+  status   RecurringStatus   @default(ACTIVE)
+  interval RecurringInterval @default(MONTHLY)
+
+  dayOfMonth      Int       @default(1)
+  paymentTermDays Int       @default(14)
+  startDate       DateTime  @default(now())
+  endDate         DateTime?
+  nextRunAt       DateTime
+  lastRunAt       DateTime?
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client   Client                 @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  items    RecurringInvoiceItem[]
+  invoices Invoice[]
+
+  @@index([userId, status])
+  @@index([status, nextRunAt])
+}
+
+model RecurringInvoiceItem {
+  id                 String  @id @default(cuid())
+  recurringInvoiceId String
+  name               String
+  quantity           Decimal @db.Decimal(12, 3)
+  unitPriceNet       Decimal @db.Decimal(12, 2)
+  vatRate            Decimal @db.Decimal(5, 2)
+  position           Int     @default(0)
+
+  recurringInvoice RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([recurringInvoiceId])
+}
