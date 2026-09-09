@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { requireCompany } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { clientSchema } from '@/lib/validations/client'
+import { formToObject } from '@/lib/form'
 
 export type ClientFormState = {
   error?: string
@@ -12,16 +13,7 @@ export type ClientFormState = {
 }
 
 function parseForm(formData: FormData) {
-  return clientSchema.safeParse({
-    name: formData.get('name'),
-    taxId: formData.get('taxId'),
-    email: formData.get('email'),
-    addressLine: formData.get('addressLine'),
-    postalCode: formData.get('postalCode'),
-    city: formData.get('city'),
-    country: formData.get('country'),
-    notes: formData.get('notes'),
-  })
+  return clientSchema.safeParse(formToObject(formData))
 }
 
 export async function saveClientAction(
