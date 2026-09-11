@@ -82,7 +82,23 @@ export function InvoiceDocument({
         <PartyBlock label="Nabywca" party={buyer} />
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Mobile: a table this dense just clips on narrow screens, so pozycje become cards. */}
+      <div className="flex flex-col gap-2 sm:hidden">
+        {lines.map((line, i) => (
+          <div key={i} className="border-border flex flex-col gap-1 rounded-lg border px-3 py-2.5">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-medium">{line.name}</p>
+              <p className="shrink-0 font-medium tabular-nums">{formatAmount(line.gross)}</p>
+            </div>
+            <p className="text-muted-foreground text-xs tabular-nums">
+              {formatQuantity(line.quantity)} × {formatAmount(line.unitPriceNet)} · VAT{' '}
+              {formatQuantity(line.vatRate)}% · netto {formatAmount(line.net)}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto sm:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-border text-muted-foreground border-b text-xs tracking-wide uppercase">
@@ -122,19 +138,25 @@ export function InvoiceDocument({
           <table className="text-sm">
             <thead>
               <tr className="text-muted-foreground text-xs tracking-wide uppercase">
-                <th className="pr-4 text-left font-medium">Stawka</th>
-                <th className="px-4 text-right font-medium">Netto</th>
-                <th className="px-4 text-right font-medium">VAT</th>
-                <th className="pl-4 text-right font-medium">Brutto</th>
+                <th className="pr-2 text-left font-medium sm:pr-4">Stawka</th>
+                <th className="px-2 text-right font-medium sm:px-4">Netto</th>
+                <th className="px-2 text-right font-medium sm:px-4">VAT</th>
+                <th className="pl-2 text-right font-medium sm:pl-4">Brutto</th>
               </tr>
             </thead>
             <tbody>
               {vatBreakdown.map((row) => (
                 <tr key={row.rate}>
-                  <td className="pr-4 tabular-nums">{formatQuantity(row.rate)}%</td>
-                  <td className="px-4 text-right tabular-nums">{formatAmount(row.net)}</td>
-                  <td className="px-4 text-right tabular-nums">{formatAmount(row.vat)}</td>
-                  <td className="pl-4 text-right tabular-nums">{formatAmount(row.gross)}</td>
+                  <td className="pr-2 tabular-nums sm:pr-4">{formatQuantity(row.rate)}%</td>
+                  <td className="px-2 text-right tabular-nums sm:px-4">
+                    {formatAmount(row.net)}
+                  </td>
+                  <td className="px-2 text-right tabular-nums sm:px-4">
+                    {formatAmount(row.vat)}
+                  </td>
+                  <td className="pl-2 text-right tabular-nums sm:pl-4">
+                    {formatAmount(row.gross)}
+                  </td>
                 </tr>
               ))}
             </tbody>
