@@ -1,5 +1,7 @@
 # Faktury
 
+[![CI](https://github.com/Dnapieraj/faktury/actions/workflows/ci.yml/badge.svg)](https://github.com/Dnapieraj/faktury/actions/workflows/ci.yml)
+
 Aplikacja do fakturowania dla freelancerów i małych firm. Każdy użytkownik = jedna firma
 z własnymi klientami i fakturami (pełna izolacja danych po `userId`).
 
@@ -7,6 +9,35 @@ z własnymi klientami i fakturami (pełna izolacja danych po `userId`).
 Stripe → klient płaci → webhook `checkout.session.completed` → status „opłacona” → potwierdzenie
 do właściciela. Do tego faktury cykliczne (co miesiąc) i codzienne oznaczanie zaległości +
 przypomnienia — wszystko na Vercel Cron.
+
+### 🔗 [faktury-phi.vercel.app](https://faktury-phi.vercel.app)
+
+Konto demo — nie trzeba się rejestrować:
+
+```
+e-mail:  demo@faktury.dev
+hasło:   demo12345
+```
+
+Zawiera przykładowych klientów i faktury w różnych statusach (szkic, wysłana, zaległa,
+opłacona), więc dashboard i wykres przychodu od razu pokazują realne dane.
+
+## Zrzuty ekranu
+
+| Landing | Panel |
+| --- | --- |
+| ![Landing](./docs/screenshots/landing.png) | ![Dashboard](./docs/screenshots/dashboard.png) |
+
+| Lista faktur | Widok faktury |
+| --- | --- |
+| ![Lista faktur](./docs/screenshots/invoices.png) | ![Szczegóły faktury](./docs/screenshots/invoice-detail.png) |
+
+<details>
+<summary>Tryb ciemny</summary>
+
+![Dashboard w trybie ciemnym](./docs/screenshots/dashboard-dark.png)
+
+</details>
 
 ## Stack
 
@@ -84,6 +115,18 @@ Zobacz [`DEPLOYMENT.md`](./DEPLOYMENT.md) — Vercel + Neon, zmienne środowisko
 - [x] Faktury cykliczne + przypomnienia (Vercel Cron)
 - [x] Dashboard z wykresem przychodu
 - [x] Testy (Vitest + Playwright) + GitHub Actions
+
+## O projekcie
+
+Trzeci projekt portfolio (po systemie rezerwacji dla warsztatu samochodowego i systemie do
+zarządzania magazynem), zbudowany żeby pogłębić ten sam stack o integracje, które pojawiają
+się w prawdziwych produktach SaaS: płatności i webhooki, maile transakcyjne, generowanie PDF
+i zadania cykliczne (cron). Cały przepływ — od wystawienia faktury po zaksięgowaną wpłatę —
+działa end-to-end na produkcji, nie tylko lokalnie.
+
+> Aplikacja do fakturowania (Next.js 16, Prisma, Postgres, Stripe, Resend) z pełnym
+> przepływem płatności online: faktura → PDF → e-mail z linkiem do płatności → webhook →
+> automatyczne potwierdzenie. Faktury cykliczne i przypomnienia o zaległościach na cronie.
 
 ---
 
