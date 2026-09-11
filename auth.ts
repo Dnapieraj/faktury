@@ -6,15 +6,14 @@ import { prisma } from '@/lib/prisma'
 import { verifyPassword } from '@/lib/password'
 import { loginSchema } from '@/lib/validations/auth'
 import { authConfig } from '@/auth.config'
-
-const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET)
+import { isGoogleEnabled } from '@/lib/env'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
   session: { strategy: 'jwt' },
   providers: [
-    ...(googleEnabled ? [Google({ allowDangerousEmailAccountLinking: true })] : []),
+    ...(isGoogleEnabled() ? [Google({ allowDangerousEmailAccountLinking: true })] : []),
     Credentials({
       credentials: {
         email: { type: 'email' },

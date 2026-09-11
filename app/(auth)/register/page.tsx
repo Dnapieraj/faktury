@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirectIfAuthenticated } from '@/lib/auth'
+import { isGoogleEnabled } from '@/lib/env'
 import { GoogleButton } from '@/components/auth/google-button'
 import { RegisterForm } from './register-form'
 
@@ -20,13 +21,16 @@ export default async function RegisterPage() {
         </p>
       </div>
 
-      <GoogleButton />
-
-      <div className="text-muted-foreground flex items-center gap-3 text-xs">
-        <span className="bg-border h-px flex-1" />
-        lub e-mailem
-        <span className="bg-border h-px flex-1" />
-      </div>
+      {isGoogleEnabled() ? (
+        <>
+          <GoogleButton />
+          <div className="text-muted-foreground flex items-center gap-3 text-xs">
+            <span className="bg-border h-px flex-1" />
+            lub e-mailem
+            <span className="bg-border h-px flex-1" />
+          </div>
+        </>
+      ) : null}
 
       <RegisterForm />
 
