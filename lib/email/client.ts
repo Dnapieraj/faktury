@@ -1,5 +1,10 @@
 import 'server-only'
 import { Resend } from 'resend'
+// resend's SDK requires this to render `react:` email props into HTML, but only
+// declares it as an *optional peer dependency* and loads it dynamically — Vercel's
+// serverless function bundler doesn't trace that require, so without a direct,
+// statically-visible import here the module is silently missing at runtime.
+import '@react-email/render'
 
 const apiKey = process.env.RESEND_API_KEY
 
