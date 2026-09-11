@@ -62,7 +62,8 @@ export async function runRecurringJob(now: Date = new Date()) {
       issued.push({ id: res.invoiceId, number: res.number })
     } catch (error) {
       console.error(`[cron/recurring] ${rec.id} failed`, error)
-      errors.push(rec.id)
+      const message = error instanceof Error ? error.message : String(error)
+      errors.push(`${rec.id}: ${message}`)
     }
   }
 
