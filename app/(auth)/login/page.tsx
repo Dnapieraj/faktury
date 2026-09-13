@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirectIfAuthenticated } from '@/lib/auth'
 import { isGoogleEnabled } from '@/lib/env'
+import { DemoLoginButton } from '@/components/auth/demo-login-button'
 import { GoogleButton } from '@/components/auth/google-button'
 import { Alert } from '@/components/ui/alert'
 import { LoginForm } from './login-form'
@@ -36,6 +37,13 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
       {oauthError ? (
         <Alert variant="danger">{OAUTH_ERRORS[oauthError] ?? 'Nie udało się zalogować.'}</Alert>
       ) : null}
+
+      <DemoLoginButton callbackUrl={callbackUrl} />
+      <div className="text-muted-foreground flex items-center gap-3 text-xs">
+        <span className="bg-border h-px flex-1" />
+        lub
+        <span className="bg-border h-px flex-1" />
+      </div>
 
       {isGoogleEnabled() ? (
         <>

@@ -80,3 +80,11 @@ export async function registerAction(
 export async function signInWithGoogle(callbackUrl?: string) {
   await signIn('google', { redirectTo: callbackUrl || '/dashboard' })
 }
+
+export async function signInWithDemo(callbackUrl?: string) {
+  await signIn('credentials', {
+    email: 'demo@faktury.dev',
+    password: 'demo12345',
+    redirectTo: callbackUrl || '/dashboard',
+  })
+}
